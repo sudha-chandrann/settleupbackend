@@ -1,28 +1,52 @@
 import { User } from "../model/user.model.js";
 import dotenv from "dotenv";
 import { sendVerifyEmail } from "../utils/sendVerifyEmail.js";
-
+import { sendErrorResponse, sendSuccessResponse } from "../utils/index.js";
+import Joi from "joi";
 dotenv.config();
+
+const registerValidation = Joi.object({
+  name: Joi.string().min(2).max(50).required().messages({
+    "string.min": "Name must be at least 2 characters long",
+    "string.max": "Name cannot exceed 50 characters",
+    "any.required": "Name is required",
+  }),
+  email: Joi.string().email().required().messages({
+    "string.email": "Please enter a valid email address",
+    "any.required": "Email is required",
+  }),
+  password: Joi.string().min(6).required().messages({
+    "string.min": "Password must be at least 6 characters long",
+    "any.required": "Password is required",
+  }),
+});
+
+const loginValidation = Joi.object({
+  email: Joi.string().email().required().messages({
+    "string.email": "Please enter a valid email address",
+    "any.required": "Email is required",
+  }),
+  password: Joi.string().required().messages({
+    "any.required": "Password is required",
+  }),
+});
 
 const registerUser = async (req, res) => {
   try {
-    const { name, email, password } = req.body;
-    if (!name || !email || !password ) {
-      return res.status(400).json({
-        message: "Please fill in all required fields",
-        success: false,
-        status: 400,
-      });
+    const { error, value } = registerValidation.validate(req.body);
+    if (error) {
+      return sendErrorResponse(res, 400, "Validation failed", error.details);
     }
-    const existingUser = await User.findOne({ email });
+    const { name, email, password } = value;
 
+    const existingUser = await User.findOne({ email });
     if (existingUser) {
       if (existingUser.verified) {
-        return res.status(409).json({
-          message: "User with this email  already exists",
-          success: false,
-          status: 409,
-        });
+        return sendErrorResponse(
+          res,
+          409,
+          "User already exists with this email"
+        );
       }
       await User.deleteOne({ _id: existingUser._id });
     }
@@ -34,89 +58,67 @@ const registerUser = async (req, res) => {
     });
 
     if (!newUser) {
-      return res.status(500).json({
-        message: "Failed to create user account",
-        success: false,
-        status: 500,
-      });
+      return sendErrorResponse(res, 409, "Failed to create user account");
     }
-
-    return res.status(201).json({
-      message: "User account created successfully",
-      success: true,
-      status: 201,
-    });
+    return sendSuccessResponse(res, 201, "User registered successfully");
   } catch (error) {
     console.error("Registration error:", error);
-    return res.status(500).json({
-      message: error.message || "Error registering user",
-      success: false,
-      status: 500,
-    });
+    if (error.code === 11000) {
+      return sendErrorResponse(res, 409, "User already exists with this email");
+    }
+    return sendErrorResponse(
+      res,
+      500,
+      error.message || "Internal server error"
+    );
   }
 };
 
 const loginUser = async (req, res) => {
   try {
-    const { email, password } = req.body;
-
-    if (!email || !password) {
-      return res.status(400).json({
-        message: "Email and password are required",
-        success: false,
-        status: 400,
-      });
+    const { error, value } = loginValidation.validate(req.body);
+    if (error) {
+      return sendErrorResponse(res, 400, "Validation failed", error.details);
     }
+
+    const { email, password } = value;
 
     const user = await User.findOne({ email });
     if (!user) {
-      return res.status(404).json({
-        message: "User not found with this email",
-        success: false,
-        status: 404,
-      });
+      return sendErrorResponse(res, 401, "Invalid email or password");
     }
-
     if (!user.verified) {
-      return res.status(403).json({
-        message: "Please verify your email address before logging in",
-        success: false,
-        status: 403,
-      });
+      return sendErrorResponse(
+        res,
+        401,
+        "Email verification is required to proceed."
+      );
     }
 
     const isValidPassword = await user.isPasswordCorrect(password);
     if (!isValidPassword) {
-      return res.status(401).json({
-        message: "Invalid credentials",
-        success: false,
-        status: 401,
-      });
+      return sendErrorResponse(res, 401, "Invalid email or password");
     }
 
     const refreshToken = user.generateRefreshToken();
 
-    const cookieOptions = {
-      httpOnly: true,
-      secure: true,
-      sameSite: "none",
-      maxAge: 24 * 60 * 60 * 1000,
-      path: "/",
-    };
-
-    return res.cookie("token", refreshToken, cookieOptions).status(200).json({
-      message: "Login successful",
-      success: true,
-      status: 200,
+    return sendSuccessResponse(res, 200, "Login successful", {
+      user: {
+        id: user._id,
+        name: user.name,
+        email: user.email,
+        isEmailVerified: user.isEmailVerified,
+        avatar: user.avatar,
+      },
       token: refreshToken,
     });
   } catch (error) {
     console.error("Login error:", error);
-    return res.status(500).json({
-      message: error.message || "Authentication failed",
-      success: false,
-      status: 500,
-    });
+    return sendErrorResponse(
+      res,
+      500,
+      error.message || "Internal server error"
+    );
   }
 };
 
@@ -300,7 +302,6 @@ const getcurrentUser = async (req, res) => {
     });
   }
 };
-
 
 export {
   registerUser,
