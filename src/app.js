@@ -3,6 +3,7 @@ import cors from "cors"
 import dotenv from 'dotenv';
 import cookieParser from "cookie-parser";
 import UserRouter from "./route/user.route.js"
+import GroupRouter from "./route/group.route.js"
 
 dotenv.config();
 
@@ -26,5 +27,6 @@ app.use(express.urlencoded({
 app.use(express.static("public"))
 app.use(cookieParser())
 app.use("/api/v1/users", UserRouter);
+app.use("/api/v1/groups", GroupRouter);
 
 export {app}

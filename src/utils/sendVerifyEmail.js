@@ -24,7 +24,7 @@ export async function sendVerifyEmail(to, code) {
           </span>
         </div>
         <p style="font-size: 14px; color: #666;">
-          This code will expire in <strong>10 minutes</strong>. If you did not request this, please ignore this email or contact our support team.
+          This code will expire in <strong>3 minutes</strong>. If you did not request this, please ignore this email or contact our support team.
         </p>
         <hr style="margin: 30px 0; border: none; border-top: 1px solid #eaeaea;">
         <p style="font-size: 12px; color: #999; text-align: center;">

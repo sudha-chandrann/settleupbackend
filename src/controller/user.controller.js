@@ -41,7 +41,7 @@ const registerUser = async (req, res) => {
 
     const existingUser = await User.findOne({ email });
     if (existingUser) {
-      if (existingUser.verified) {
+      if (existingUser.isEmailVerified) {
         return sendErrorResponse(
           res,
           409,
@@ -87,7 +87,7 @@ const loginUser = async (req, res) => {
     if (!user) {
       return sendErrorResponse(res, 401, "Invalid email or password");
     }
-    if (!user.verified) {
+    if (!user.isEmailVerified) {
       return sendErrorResponse(
         res,
         401,
@@ -127,118 +127,80 @@ const sendVerificationCode = async (req, res) => {
     const { email } = req.body;
 
     if (!email) {
-      return res.status(400).json({
-        message: "Email is required",
-        success: false,
-        status: 400,
-      });
+      return sendErrorResponse(res, 400, "Email is required.");
     }
 
     const user = await User.findOne({ email });
     if (!user) {
-      return res.status(404).json({
-        message: "User not found with this email",
-        success: false,
-        status: 404,
-      });
+      return sendErrorResponse(res, 404, "No account found with the provided email.");
     }
 
-    if (user.verified) {
-      return res.status(400).json({
-        message: "Email is already verified",
-        success: false,
-        status: 400,
-      });
+    if (user.isEmailVerified) {
+      return sendErrorResponse(res, 400, "This email is already verified.");
     }
 
     const code = Math.floor(100000 + Math.random() * 900000).toString();
-    const expiry = new Date(Date.now() + 10 * 60 * 1000);
+    const expiry = new Date(Date.now() + 3 * 60 * 1000);
 
-    user.verficationCode = code;
-    user.verficationCodeExpires = expiry;
+    user.verificationCode = code;
+    user.verificationCodeExpires = expiry;
     await user.save();
 
     await sendVerifyEmail(email, code);
 
-    return res.status(200).json({
-      message: "Verification code sent successfully",
-      success: true,
-      status: 200,
-    });
+    return sendSuccessResponse(res, 200, "A verification code has been sent to your email.");
   } catch (error) {
     console.error("Error sending verification code:", error);
-    return res.status(500).json({
-      message: error.message || "Failed to send verification code",
-      success: false,
-      status: 500,
-    });
+    return sendErrorResponse(
+      res,
+      500,
+      "An unexpected error occurred while sending the verification code. Please try again later."
+    );
   }
 };
+
 
 const verifyEmail = async (req, res) => {
   try {
     const { email, code } = req.body;
 
     if (!email || !code) {
-      return res.status(400).json({
-        message: "Email and verification code are required",
-        success: false,
-        status: 400,
-      });
+      return sendErrorResponse(res, 400, "Both email and verification code are required.");
     }
 
     const user = await User.findOne({ email });
     if (!user) {
-      return res.status(404).json({
-        message: "User not found with this email",
-        success: false,
-        status: 404,
-      });
+      return sendErrorResponse(res, 404, "No account found with the provided email.");
     }
 
-    if (user.verified) {
-      return res.status(400).json({
-        message: "Email is already verified",
-        success: false,
-        status: 400,
-      });
+    if (user.isEmailVerified) {
+      return sendErrorResponse(res, 400, "This email is already verified.");
     }
 
-    if (!user.verficationCode || new Date() > user.verficationCodeExpires) {
-      return res.status(400).json({
-        message: "Verification code has expired",
-        success: false,
-        status: 400,
-      });
+    if (!user.verificationCode || new Date() > user.verificationCodeExpires) {
+      return sendErrorResponse(res, 400, "The verification code has expired. Please request a new one.");
     }
 
-    if (user.verficationCode !== code) {
-      return res.status(401).json({
-        message: "Invalid verification code",
-        success: false,
-        status: 401,
-      });
+    if (user.verificationCode !== code) {
+      return sendErrorResponse(res, 401, "The verification code you entered is invalid.");
     }
 
-    user.verified = true;
-    user.verficationCode = "";
-    user.verficationCodeExpires = null;
+    user.isEmailVerified = true;
+    user.verificationCode = "";
+    user.verificationCodeExpires = null;
     await user.save();
 
-    return res.status(200).json({
-      message: "Email verified successfully",
-      success: true,
-      status: 200,
-    });
+    return sendSuccessResponse(res, 200, "Your email has been verified successfully.");
   } catch (error) {
     console.error("Email verification error:", error);
-    return res.status(500).json({
-      message: error.message || "Email verification failed",
-      success: false,
-      status: 500,
-    });
+    return sendErrorResponse(
+      res,
+      500,
+      "An unexpected error occurred during email verification. Please try again later."
+    );
   }
 };
+
 
 const logout = async (req, res) => {
   try {

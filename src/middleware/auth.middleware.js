@@ -1,8 +1,8 @@
-import { User } from "../src/model/user.model.js";
-import { sendErrorResponse } from "../src/utils.js";
+import { User } from "../model/user.model.js";
+import { sendErrorResponse } from "../utils/index.js";
 import jwt from "jsonwebtoken";
 
-export default  authenticateToken = async (req, res, next) => {
+ const authenticateToken = async (req, res, next) => {
   try {
     const authHeader = req.headers.authorization;
     const token = authHeader && authHeader.split(' ')[1];
@@ -12,7 +12,7 @@ export default  authenticateToken = async (req, res, next) => {
     }
 
     const decoded = jwt.verify(token, process.env.REFRESH_TOKEN_SECRET || 'fallback_secret_key');
-    const user = await User.findById(decoded.userId).select('-password');
+    const user = await User.findById(decoded._id).select('-password');
     
     if (!user|| !user.isEmailVerified) {
       return sendErrorResponse(res, 401, 'Invalid token or user not found');
@@ -25,3 +25,5 @@ export default  authenticateToken = async (req, res, next) => {
     return sendErrorResponse(res, 401, error.message||'Invalid or expired token');
   }
 };
+
+export {authenticateToken}

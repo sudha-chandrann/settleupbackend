@@ -27,8 +27,8 @@ const userSchema = new Schema(
   },
   avatar: {type:String,default:null},
   isEmailVerified: { type: Boolean, default: false },
-  verficationCode:{type:String,default:''},
-  verficationCodeExpires:{ type: Date,default: null},
+  verificationCode:{type:String,default:''},
+  verificationCodeExpires:{ type: Date,default: null},
   },
   { timestamps: true }
 );
